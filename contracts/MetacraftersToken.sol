@@ -1,21 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
+import "@openzeppelin/contracts/interfaces/IERC20.sol";
 
-interface IERC20 {
-    function totalSupply() external view returns (uint);
-
-    function balanceOf(address account) external view returns (uint);
-
-    function transfer(address recipient, uint amount) external returns (bool);
-
-    event Transfer(address indexed from, address indexed to, uint amount);
-}
-
-contract MetacraftersToken is IERC20 {
+contract Metacrafters is IERC20 {
     address public owner;
     uint public override totalSupply;
     mapping(address => uint) public override balanceOf;
-    string public name = "Metacrafters Token";
+    mapping(address => mapping(address => uint)) public override allowance;
+
+    string public name = "Metacrafters Tokens";
     string public symbol = "MTK";
     uint8 public decimals = 18;
 
@@ -32,19 +25,44 @@ contract MetacraftersToken is IERC20 {
         address recipient,
         uint amount
     ) external override returns (bool) {
+        require(balanceOf[msg.sender] >= amount, "Insufficient balance");
         balanceOf[msg.sender] -= amount;
         balanceOf[recipient] += amount;
         emit Transfer(msg.sender, recipient, amount);
         return true;
     }
 
-    function mint(uint amount) external onlyOwner {
-        balanceOf[msg.sender] += amount;
+    function approve(
+        address spender,
+        uint amount
+    ) external override returns (bool) {
+        allowance[msg.sender][spender] = amount;
+        emit Approval(msg.sender, spender, amount);
+        return true;
+    }
+
+    function transferFrom(
+        address sender,
+        address recipient,
+        uint amount
+    ) external override returns (bool) {
+        require(balanceOf[sender] >= amount, "Insufficient balance");
+        require(allowance[sender][msg.sender] >= amount, "Allowance exceeded");
+        balanceOf[sender] -= amount;
+        balanceOf[recipient] += amount;
+        allowance[sender][msg.sender] -= amount;
+        emit Transfer(sender, recipient, amount);
+        return true;
+    }
+
+    function mint(address account, uint amount) external onlyOwner {
+        balanceOf[account] += amount;
         totalSupply += amount;
-        emit Transfer(address(0), msg.sender, amount);
+        emit Transfer(address(0), account, amount);
     }
 
     function burn(uint amount) external {
+        require(balanceOf[msg.sender] >= amount, "Insufficient balance");
         balanceOf[msg.sender] -= amount;
         totalSupply -= amount;
         emit Transfer(msg.sender, address(0), amount);
